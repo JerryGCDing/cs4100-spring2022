@@ -162,7 +162,7 @@ def uniformCostSearch(problem):
     # goal check
     while not problem.isGoalState(curr_state[0]):
         curr_state = path.pop()
-        discovered.append(curr_state)
+        discovered.append(curr_state[0])
         successors = problem.getSuccessors(curr_state[0])
         # past action history
         past_actions = curr_state[1]
