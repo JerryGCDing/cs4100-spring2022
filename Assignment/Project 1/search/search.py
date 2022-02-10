@@ -156,13 +156,13 @@ def uniformCostSearch(problem):
     discovered = []
     # queue sorted by nodes with its current path cost
     path = util.PriorityQueueWithFunction(lambda state: problem.getCostOfActions(state[1]))
-    curr_state = problem.getStartState()
-    path.push([curr_state, []])
+    curr_state = [problem.getStartState(), []]
+    path.push(curr_state)
 
     # goal check
-    while not problem.isGoalState(curr_state):
+    while not problem.isGoalState(curr_state[0]):
         curr_state = path.pop()
-        discovered.append(curr_state[0])
+        discovered.append(curr_state)
         successors = problem.getSuccessors(curr_state[0])
         # past action history
         past_actions = curr_state[1]
@@ -171,7 +171,6 @@ def uniformCostSearch(problem):
             node = _[0]
             # check if the state is already expanded
             if node not in discovered:
-                curr_action = [i for i in past_actions]
                 if problem.isGoalState(node):
                     return [i for i in past_actions] + [stringToDirection(_[1])]
 
@@ -195,11 +194,11 @@ def aStarSearch(problem, heuristic=nullHeuristic):
     discovered = []
     # queue sorted by nodes with its current path cost with heuristic value
     path = util.PriorityQueueWithFunction(lambda state: problem.getCostOfActions(state[1]) + heuristic(state[0], problem))
-    curr_state = problem.getStartState()
-    path.push([curr_state, []])
+    curr_state = [problem.getStartState(), []]
+    path.push(curr_state)
 
     # goal check
-    while not problem.isGoalState(curr_state):
+    while not problem.isGoalState(curr_state[0]):
         curr_state = path.pop()
         discovered.append(curr_state[0])
         successors = problem.getSuccessors(curr_state[0])
@@ -210,7 +209,6 @@ def aStarSearch(problem, heuristic=nullHeuristic):
             node = _[0]
             # check if the state is already expanded
             if node not in discovered:
-                curr_action = [i for i in past_actions]
                 if problem.isGoalState(node):
                     return [i for i in past_actions] + [stringToDirection(_[1])]
 

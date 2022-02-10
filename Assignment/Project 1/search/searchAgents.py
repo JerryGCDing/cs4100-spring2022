@@ -349,12 +349,15 @@ class CornersProblem(search.SearchProblem):
             nextx, nexty = int(x + dx), int(y + dy)
             if not self.walls[nextx][nexty]:
                 pos = (nextx, nexty)
-                if pos in self.corners and self.goal[self.corners.index(pos)] != 0:
-                    nextState = (nextx, nexty, _ + 1)
-                    successors.append((nextState, action))
-                elif _ == self.num_foods:
-                    nextState = (nextx, nexty, _)
-                    successors.append((nextState, action))
+                if _ == self.num_foods:
+                    if pos in self.corners and self.goal[self.corners.index(pos)] != 0:
+                        # reaches one corner
+                        nextState = (nextx, nexty, _ + 1)
+                        successors.append((nextState, action))
+                    else:
+                        # nodes need to be at same time dimension
+                        nextState = (nextx, nexty, _)
+                        successors.append((nextState, action))
 
         self._expanded += 1 # DO NOT CHANGE
         return successors
