@@ -234,5 +234,5 @@ def stringToDirection(direction):
         return Directions.SOUTH
     elif direction == 'East':
         return Directions.EAST
-    else:
+    elif direction == 'West':
         return Directions.WEST

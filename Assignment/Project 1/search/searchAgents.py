@@ -292,6 +292,8 @@ class CornersProblem(search.SearchProblem):
         self.goal = [1, 1, 1, 1]
         # number of food eaten
         self.num_foods = 0
+        # cache of heuristic
+        self.heu_list = {}
 
     def getStartState(self):
         """
@@ -497,7 +499,40 @@ def foodHeuristic(state, problem):
     """
     position, foodGrid = state
     "*** YOUR CODE HERE ***"
-    return 0
+    # 2d list of the game grid
+    food2d = foodGrid.asList()
+    # store height and width
+    height = len(food2d)
+    width = len(food2d[0])
+    # coordinates of food
+    food_coord = []
+
+    # iterate the game state
+    for row in range(height):
+        for col in range(width):
+            if food2d[row][col]:
+                food_coord.append((col, row))
+
+    if position in problem.heuristicInfo:
+        heu, target = problem.heuristicInfo[position]
+        # check if the list been updated
+        if target in food_coord:
+            return heu
+
+    # if not in dictionary or has been updated
+    x, y = position
+    heu_list = []
+    for index in range(len(food_coord)):
+        pos = food_coord[index]
+        heu_list.append(abs(pos[0] - x) + abs(pos[1] - y))
+    # coordinate of the closest food
+    min_heu = min(heu_list)
+    min_pos = food_coord[heu_list.index(min_heu)]
+    # update heu info
+    problem.heuristicInfo[position] = (min_pos, min_heu)
+    # return heuristic
+    print(min_heu)
+    return min_heu
 
 class ClosestDotSearchAgent(SearchAgent):
     "Search for all food using a sequence of searches"
