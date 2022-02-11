@@ -290,8 +290,8 @@ class CornersProblem(search.SearchProblem):
         "*** YOUR CODE HERE ***"
         # corresponds with corners have food, 0 - empty, 1 - food
         self.goal = [1, 1, 1, 1]
-        # number of food eaten
-        # self.num_foods = 0
+        # precompute heuristic list
+        self.pre_heu = {}
 
     def getStartState(self):
         """
@@ -332,22 +332,31 @@ class CornersProblem(search.SearchProblem):
             #   hitsWall = self.walls[nextx][nexty]
 
             "*** YOUR CODE HERE ***"
-            x, y, _ = state
+            if len(state) == 3:
+                x, y, _ = state
 
-            dx, dy = Actions.directionToVector(action)
-            nextx, nexty = int(x + dx), int(y + dy)
-            if not self.walls[nextx][nexty]:
-                pos = (nextx, nexty)
-                if pos in self.corners and _[self.corners.index(pos)] != 0:
-                    # reaches one corner
-                    new_state = [i for i in _]
-                    new_state[self.corners.index(pos)] = 0
-                    nextState = (nextx, nexty, tuple(new_state))
-                    # update game state
-                    successors.append((nextState, action))
-                else:
-                    # nodes need to be at same time dimension
-                    nextState = (nextx, nexty, tuple([i for i in _]))
+                dx, dy = Actions.directionToVector(action)
+                nextx, nexty = int(x + dx), int(y + dy)
+                if not self.walls[nextx][nexty]:
+                    pos = (nextx, nexty)
+                    if pos in self.corners and _[self.corners.index(pos)] != 0:
+                        # reaches one corner
+                        new_state = [i for i in _]
+                        new_state[self.corners.index(pos)] = 0
+                        nextState = (nextx, nexty, tuple(new_state))
+                        # update game state
+                        successors.append((nextState, action))
+                    else:
+                        # nodes need to be at same time dimension
+                        nextState = (nextx, nexty, tuple([i for i in _]))
+                        successors.append((nextState, action))
+
+            elif len(state) == 2:
+                x, y = state
+                dx, dy = Actions.directionToVector(action)
+                nextx, nexty = int(x + dx), int(y + dy)
+                if not self.walls[nextx][nexty]:
+                    nextState = (nextx, nexty)
                     successors.append((nextState, action))
 
         self._expanded += 1 # DO NOT CHANGE
@@ -382,9 +391,9 @@ def cornersHeuristic(state, problem):
     """
     corners = problem.corners # These are the corner coordinates
     walls = problem.walls # These are the walls of the maze, as a Grid (game.py)
-    walls2d = walls.asList()
 
     "*** YOUR CODE HERE ***"
+    walls2d = walls.asList()
     x, y, _ = state
     heu_list = []
     # attempt 1
@@ -428,16 +437,15 @@ def cornersHeuristic(state, problem):
                 heu_list.append(net_heu + cross * (1 / 1000))
     '''
     # attempt 2
-    '''
     for index in range(len(_)):
         if _[index] == 1:
             tx, ty = corners[index]
             dx = tx - x
             dy = ty - y
             # manhattan distance
-            net_heu = abs(dx) + abs(dy)
+            # net_heu = abs(dx) + abs(dy)
             # euclid distance
-            # net_heu = (dx ** 2 + dy ** 2) ** 0.5
+            net_heu = (dx ** 2 + dy ** 2) ** 0.5
 
             # calculated a linear algebra towards the goal
             if dx == 0:
@@ -458,7 +466,6 @@ def cornersHeuristic(state, problem):
                     # progress
                     x += 1
                 heu_list.append(net_heu)
-    '''
     # attempt 3 (exceed maximum recursion depth)
     '''
     goal = []
@@ -572,10 +579,47 @@ def cornersHeuristic(state, problem):
     for _ in action_space:
         heu_list.append(action_cost(_))
     '''
+    # attempt 4
+    '''
+    # stored computed heuristic
+    past_cache = [0, 0, 0, 0]
+    # bfs search
+    if (x, y) not in problem.pre_heu:
+        path = util.Queue()
+        # only stores cost of actions
+        discovered = {}
+        curr_state = (x, y)
+        path.push(curr_state)
+        discovered[curr_state] = 0
+        goal_reached = sum(_)
 
+        while goal_reached < 4:
+            curr_state = path.pop()
+            # fake state
+            successors = problem.getSuccessors(curr_state)
+            past_cost = discovered[curr_state]
+            # iterate through the frontiers
+            for s in successors:
+                temp = s[0]
+                if temp not in discovered:
+                    path.push(temp)
+                    discovered[temp] = past_cost + 1
+                    # goal check
+                    if temp in corners:
+                        goal_reached += 1
+                        past_cache[corners.index(temp)] = discovered[temp]
+                        
+        problem.pre_heu[(x, y)] = past_cache
+
+    temp = problem.pre_heu[(x, y)]
+    # return only available heuristic
+    for index in range(len(_)):
+        if _[index] == 1:
+            heu_list.append(temp[index])
+    '''
     # heuristic to the closest non-empty corner
     min_heu = min(heu_list)
-    return min_heu
+    return 1.001 * min_heu
 
 class AStarCornersAgent(SearchAgent):
     "A SearchAgent for FoodSearchProblem using A* and your foodHeuristic"
