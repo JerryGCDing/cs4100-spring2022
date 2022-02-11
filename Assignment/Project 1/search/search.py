@@ -91,6 +91,7 @@ def depthFirstSearch(problem):
     # discovered nodes with its corresponding path
     discovered = {}
     curr_state = problem.getStartState()
+    print(curr_state)
     path.push(curr_state)
     discovered[curr_state] = []
 

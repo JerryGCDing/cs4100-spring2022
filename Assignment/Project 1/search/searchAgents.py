@@ -291,9 +291,7 @@ class CornersProblem(search.SearchProblem):
         # corresponds with corners have food, 0 - empty, 1 - food
         self.goal = [1, 1, 1, 1]
         # number of food eaten
-        self.num_foods = 0
-        # cache of heuristic
-        self.heu_list = {}
+        # self.num_foods = 0
 
     def getStartState(self):
         """
@@ -302,7 +300,7 @@ class CornersProblem(search.SearchProblem):
         """
         "*** YOUR CODE HERE ***"
         x, y = self.startingPosition
-        return (x, y, self.num_foods)
+        return (x, y, tuple(self.goal))
         # util.raiseNotDefined()
 
     def isGoalState(self, state):
@@ -310,19 +308,7 @@ class CornersProblem(search.SearchProblem):
         Returns whether this search state is a goal state of the problem.
         """
         "*** YOUR CODE HERE ***"
-        x = state[0]
-        y = state[1]
-        pos = (x, y)
-        if pos in self.corners:
-            goal_ind = self.corners.index(pos)
-            if self.goal[goal_ind] != 0:
-                # update game state
-                self.num_foods += 1
-                self.goal[goal_ind] = 0
-            # check if all the food has been reached
-            return self.num_foods == 4
-
-        return False
+        return sum(state[2]) == 0
         # util.raiseNotDefined()
 
     def getSuccessors(self, state):
@@ -347,19 +333,22 @@ class CornersProblem(search.SearchProblem):
 
             "*** YOUR CODE HERE ***"
             x, y, _ = state
+
             dx, dy = Actions.directionToVector(action)
             nextx, nexty = int(x + dx), int(y + dy)
             if not self.walls[nextx][nexty]:
                 pos = (nextx, nexty)
-                if _ == self.num_foods:
-                    if pos in self.corners and self.goal[self.corners.index(pos)] != 0:
-                        # reaches one corner
-                        nextState = (nextx, nexty, _ + 1)
-                        successors.append((nextState, action))
-                    else:
-                        # nodes need to be at same time dimension
-                        nextState = (nextx, nexty, _)
-                        successors.append((nextState, action))
+                if pos in self.corners and _[self.corners.index(pos)] != 0:
+                    # reaches one corner
+                    new_state = [i for i in _]
+                    new_state[self.corners.index(pos)] = 0
+                    nextState = (nextx, nexty, tuple(new_state))
+                    # update game state
+                    successors.append((nextState, action))
+                else:
+                    # nodes need to be at same time dimension
+                    nextState = (nextx, nexty, tuple([i for i in _]))
+                    successors.append((nextState, action))
 
         self._expanded += 1 # DO NOT CHANGE
         return successors
@@ -393,19 +382,200 @@ def cornersHeuristic(state, problem):
     """
     corners = problem.corners # These are the corner coordinates
     walls = problem.walls # These are the walls of the maze, as a Grid (game.py)
+    walls2d = walls.asList()
 
     "*** YOUR CODE HERE ***"
     x, y, _ = state
-    # list of manhattan distance to goals, 999999 as goal doesn't exist
     heu_list = []
-    for index in range(len(problem.goal)):
-        if problem.goal[index] == 1:
-            pos = problem.corners[index]
-            heu_list.append(abs(pos[0] - x) + abs(pos[1] - y))
-        else :
-            heu_list.append(999999)
+    # attempt 1
+    '''
+    # default start position
+    if _ == (1, 1, 1, 1):
+        for i in corners:
+            dx1 = x - i[0]
+            dy1 = y - i[1]
+            # from start to goal
+            dx2 = problem.startingPosition[0] - i[0]
+            dy2 = problem.startingPosition[1] - i[1]
+            # euclid distance
+            net_heu = (dx1 ** 2 + dy1 ** 2) ** 0.5
+            # cross product to approach the straight line
+            cross = abs(dx1*dy2 - dx2*dy1)
+
+            heu_list.append(net_heu + cross * (1 / 1000))
+    # start from one corner
+    else:
+        start = []
+        goal = []
+        for index in range(len(_)):
+            if _[index] == 1:
+                goal.append(corners[index])
+            else:
+                start.append(corners[index])
+
+        for s in start:
+            for g in goal:
+                dx1 = x - g[0]
+                dy1 = y - g[1]
+                # from one corner to another
+                dx2 = s[0] - g[0]
+                dy2 = s[1] - g[1]
+                # euclid distance
+                net_heu = (dx1 ** 2 + dy1 ** 2) ** 0.5
+                # cross product to approach the straight line
+                cross = abs(dx1 * dy2 - dx2 * dy1)
+
+                heu_list.append(net_heu + cross * (1 / 1000))
+    '''
+    # attempt 2
+    '''
+    for index in range(len(_)):
+        if _[index] == 1:
+            tx, ty = corners[index]
+            dx = tx - x
+            dy = ty - y
+            # manhattan distance
+            net_heu = abs(dx) + abs(dy)
+            # euclid distance
+            # net_heu = (dx ** 2 + dy ** 2) ** 0.5
+
+            # calculated a linear algebra towards the goal
+            if dx == 0:
+                while y <= ty:
+                    if (x, y) in walls2d:
+                        # minimal cost to get around a wall
+                        net_heu += 2
+                    y += 1
+                heu_list.append(net_heu)
+            # default case
+            else:
+                m = dy / dx
+                c = ty - m * tx
+                # progress alone x-axis
+                while x <= tx:
+                    if (int(x), int(m * x + c)) in walls2d:
+                        net_heu += 2
+                    # progress
+                    x += 1
+                heu_list.append(net_heu)
+    '''
+    # attempt 3 (exceed maximum recursion depth)
+    '''
+    goal = []
+    for index in range(len(_)):
+        if _[index] == 1:
+            goal.append(corners[index])
+    # iterate through all possible moves neglect walls
+    for g in goal:
+        dx = g[0] - x
+        dy = g[1] - y
+
+        action_space = []
+
+        # generate all possible actions within the constraint
+        def action_generator(accumulator, ava_x, ava_y, direction):
+            if ava_x == 0 and ava_y == 0:
+                action_space.append(accumulator)
+
+            if direction == 'N':
+                # deep copy
+                temp = [i for i in accumulator]
+                temp.append('N')
+                action_generator(accumulator, ava_x, ava_y - 1, 'N')
+                if ava_x > 0:
+                    action_generator(accumulator, ava_x, ava_y - 1, 'E')
+                else:
+                    action_generator(accumulator, ava_x, ava_y - 1, 'W')
+            elif direction == 'S':
+                # deep copy
+                temp = [i for i in accumulator]
+                temp.append('S')
+                action_generator(accumulator, ava_x, ava_y + 1, 'S')
+                if ava_x > 0:
+                    action_generator(accumulator, ava_x, ava_y + 1, 'E')
+                else:
+                    action_generator(accumulator, ava_x, ava_y + 1, 'W')
+            elif direction == 'W':
+                # deep copy
+                temp = [i for i in accumulator]
+                temp.append('W')
+                action_generator(accumulator, ava_x + 1, ava_y, 'W')
+                if ava_y > 0:
+                    action_generator(accumulator, ava_x + 1, ava_y, 'N')
+                else:
+                    action_generator(accumulator, ava_x + 1, ava_y, 'S')
+            elif direction == 'E':
+                # deep copy
+                temp = [i for i in accumulator]
+                temp.append('E')
+                action_generator(accumulator, ava_x - 1, ava_y, 'E')
+                if ava_y > 0:
+                    action_generator(accumulator, ava_x - 1, ava_y, 'N')
+                else:
+                    action_generator(accumulator, ava_x - 1, ava_y, 'S')
+
+        # in +y direction
+        if dy > 0:
+            action_generator([], dx, dy, 'N')
+        else:
+            action_generator([], dx, dy, 'S')
+
+        # in +x direction
+        if dx > 0:
+            action_generator([], dx, dy, 'E')
+        else:
+            action_generator([], dx, dy, 'W')
+
+        # generate total heuristic of the actions
+        def action_cost(action_list):
+            total_cost = 0
+            curr_pos = (x, y)
+
+            for _ in range(len(action_list)):
+                action = action_list[_]
+                if action == 'N':
+                    curr_pos = (curr_pos[0], curr_pos[1] + 1)
+                    if curr_pos in walls2d:
+                        # minimum cost to bypass a wall
+                        total_cost += 2
+                    else:
+                        # normal
+                        total_cost += 1
+                elif action == 'S':
+                    curr_pos = (curr_pos[0], curr_pos[1] - 1)
+                    if curr_pos in walls2d:
+                        # minimum cost to bypass a wall
+                        total_cost += 2
+                    else:
+                        # normal
+                        total_cost += 1
+                elif action == 'E':
+                    curr_pos = (curr_pos[0] + 1, curr_pos[1])
+                    if curr_pos in walls2d:
+                        # minimum cost to bypass a wall
+                        total_cost += 2
+                    else:
+                        # normal
+                        total_cost += 1
+                elif action == 'W':
+                    curr_pos = (curr_pos[0] - 1, curr_pos[1])
+                    if curr_pos in walls2d:
+                        # minimum cost to bypass a wall
+                        total_cost += 2
+                    else:
+                        # normal
+                        total_cost += 1
+
+            return total_cost
+
+    # get all heuristics
+    for _ in action_space:
+        heu_list.append(action_cost(_))
+    '''
+
     # heuristic to the closest non-empty corner
-    return min(heu_list)
+    min_heu = min(heu_list)
+    return min_heu
 
 class AStarCornersAgent(SearchAgent):
     "A SearchAgent for FoodSearchProblem using A* and your foodHeuristic"
@@ -500,38 +670,34 @@ def foodHeuristic(state, problem):
     position, foodGrid = state
     "*** YOUR CODE HERE ***"
     # 2d list of the game grid
-    food2d = foodGrid.asList()
-    # store height and width
-    height = len(food2d)
-    width = len(food2d[0])
-    # coordinates of food
-    food_coord = []
+    food_coord = foodGrid.asList()
+    # initialization once
+    for _ in food_coord:
+        if _ not in problem.heuristicInfo:
+            problem.heuristicInfo[_] = True
 
-    # iterate the game state
-    for row in range(height):
-        for col in range(width):
-            if food2d[row][col]:
-                food_coord.append((col, row))
+    # markdown eaten food
+    for _ in problem.heuristicInfo:
+        if _ not in food_coord:
+            problem.heuristicInfo[_] = False
 
-    if position in problem.heuristicInfo:
-        heu, target = problem.heuristicInfo[position]
-        # check if the list been updated
-        if target in food_coord:
-            return heu
-
-    # if not in dictionary or has been updated
     x, y = position
     heu_list = []
-    for index in range(len(food_coord)):
-        pos = food_coord[index]
-        heu_list.append(abs(pos[0] - x) + abs(pos[1] - y))
-    # coordinate of the closest food
+
+
+    '''
+    for index in problem.heuristicInfo:
+        if problem.heuristicInfo[index]:
+            pos = index
+            heu_list.append(abs(pos[0] - x) + abs(pos[1] - y))
+    '''
+    # manhattan distance to the closest food
+    return min(heu_list)
     min_heu = min(heu_list)
     min_pos = food_coord[heu_list.index(min_heu)]
     # update heu info
     problem.heuristicInfo[position] = (min_pos, min_heu)
     # return heuristic
-    print(min_heu)
     return min_heu
 
 class ClosestDotSearchAgent(SearchAgent):
@@ -563,7 +729,32 @@ class ClosestDotSearchAgent(SearchAgent):
         problem = AnyFoodSearchProblem(gameState)
 
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        from search import stringToDirection
+
+        food2d = food.asList()
+        # simplified BFS
+        path = util.Queue()
+        discovered = {}
+        curr_state = startPosition
+        path.push(curr_state)
+        discovered[curr_state] = []
+
+        while True:
+            curr_state = path.pop()
+            successors = problem.getSuccessors(curr_state)
+            past_actions = discovered[curr_state]
+            # iterate through the frontiers
+            for _ in successors:
+                temp = _[0]
+                if temp not in discovered:
+                    path.push(temp)
+                    curr_actions = [i for i in past_actions]
+                    discovered[temp] = curr_actions + [stringToDirection(_[1])]
+                    # goal check
+                    if temp in food2d:
+                        return discovered[temp]
+
+        # util.raiseNotDefined()
 
 class AnyFoodSearchProblem(PositionSearchProblem):
     """
