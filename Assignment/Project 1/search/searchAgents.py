@@ -393,6 +393,7 @@ def cornersHeuristic(state, problem):
     walls = problem.walls # These are the walls of the maze, as a Grid (game.py)
 
     "*** YOUR CODE HERE ***"
+    walls2d = walls.asList()
     x, y, _ = state
     heu_list = []
     # attempt 1
@@ -436,16 +437,15 @@ def cornersHeuristic(state, problem):
                 heu_list.append(net_heu + cross * (1 / 1000))
     '''
     # attempt 2
-    '''
     for index in range(len(_)):
         if _[index] == 1:
             tx, ty = corners[index]
             dx = tx - x
             dy = ty - y
             # manhattan distance
-            net_heu = abs(dx) + abs(dy)
+            # net_heu = abs(dx) + abs(dy)
             # euclid distance
-            # net_heu = (dx ** 2 + dy ** 2) ** 0.5
+            net_heu = (dx ** 2 + dy ** 2) ** 0.5
 
             # calculated a linear algebra towards the goal
             if dx == 0:
@@ -466,7 +466,6 @@ def cornersHeuristic(state, problem):
                     # progress
                     x += 1
                 heu_list.append(net_heu)
-    '''
     # attempt 3 (exceed maximum recursion depth)
     '''
     goal = []
@@ -580,6 +579,7 @@ def cornersHeuristic(state, problem):
     for _ in action_space:
         heu_list.append(action_cost(_))
     '''
+    # attempt 4
     '''
     # stored computed heuristic
     past_cache = [0, 0, 0, 0]
@@ -619,7 +619,7 @@ def cornersHeuristic(state, problem):
     '''
     # heuristic to the closest non-empty corner
     min_heu = min(heu_list)
-    return min_heu
+    return 1.001 * min_heu
 
 class AStarCornersAgent(SearchAgent):
     "A SearchAgent for FoodSearchProblem using A* and your foodHeuristic"
