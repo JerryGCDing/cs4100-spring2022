@@ -91,29 +91,25 @@ def depthFirstSearch(problem):
     # discovered nodes with its corresponding path
     discovered = {}
     curr_state = problem.getStartState()
-    print(curr_state)
-    path.push(curr_state)
+    path.push((curr_state, 'S', 'S'))
     discovered[curr_state] = []
-
-    while True:
-        curr_state = path.pop()
+    # goal check
+    while not problem.isGoalState(curr_state):
         successors = problem.getSuccessors(curr_state)
-        past_actions = discovered[curr_state]
         # Iterate through the frontier
-        for _ in reversed(successors):
+        for _ in successors:
             temp = _[0]
             # check if the node is already discovered
             if temp not in discovered:
-                path.push(curr_state)
-                path.push(temp)
-                curr_actions = [i for i in past_actions]
-                discovered[temp] = curr_actions + [stringToDirection(_[1])]
-                # goal check
-                if problem.isGoalState(temp):
-                    return discovered[temp]
+                # stores parent and relevant action from parent
+                path.push((temp, _[1], curr_state))
 
-                break
+        next_state = path.pop()
+        curr_state = next_state[0]
+        curr_action = [i for i in discovered[next_state[2]]]
+        discovered[curr_state] = curr_action + [next_state[1]]
 
+    return discovered[curr_state]
     # print(path.list)
     # util.raiseNotDefined()
 
@@ -125,11 +121,9 @@ def breadthFirstSearch(problem):
     # discovered nodes with its corresponding path
     discovered = {}
     curr_state = problem.getStartState()
-    path.push(curr_state)
     discovered[curr_state] = []
-
-    while True:
-        curr_state = path.pop()
+    # goal check
+    while not problem.isGoalState(curr_state):
         successors = problem.getSuccessors(curr_state)
         past_actions = discovered[curr_state]
         # Iterate through the frontier
@@ -139,43 +133,45 @@ def breadthFirstSearch(problem):
             if temp not in discovered:
                 path.push(temp)
                 curr_actions = [i for i in past_actions]
-                discovered[temp] = curr_actions + [stringToDirection(_[1])]
-                # goal check
-                if problem.isGoalState(temp):
-                    return discovered[temp]
+                discovered[temp] = curr_actions + [_[1]]
 
-    # print(path.list)
+        curr_state = path.pop()
+
+    return discovered[curr_state]
     # util.raiseNotDefined()
 
 
 def uniformCostSearch(problem):
     """Search the node of least total cost first."""
     "*** YOUR CODE HERE ***"
-    from game import Directions
-
     # discovered nodes
-    discovered = []
+    discovered = {}
     # queue sorted by nodes with its current path cost
     path = util.PriorityQueueWithFunction(lambda state: problem.getCostOfActions(state[1]))
-    curr_state = [problem.getStartState(), []]
-    path.push(curr_state)
+    curr_state = problem.getStartState()
+    discovered[curr_state] = []
 
     # goal check
-    while not problem.isGoalState(curr_state[0]):
-        curr_state = path.pop()
-        discovered.append(curr_state[0])
-        successors = problem.getSuccessors(curr_state[0])
+    while not problem.isGoalState(curr_state):
+        successors = problem.getSuccessors(curr_state)
         # past action history
-        past_actions = curr_state[1]
+        past_actions = discovered[curr_state]
         # Iterate through the frontier
         for _ in successors:
             node = _[0]
+            curr_action = [i for i in past_actions] + [_[1]]
             # check if the state is already expanded
             if node not in discovered:
-                if problem.isGoalState(node):
-                    return [i for i in past_actions] + [stringToDirection(_[1])]
+                path.push([node, curr_action])
+                discovered[node] = curr_action
+            # check if lower cost than current solution
+            elif problem.getCostOfActions(curr_action) < problem.getCostOfActions(discovered[node]):
+                path.push([node, curr_action])
+                discovered[node] = curr_action
 
-                path.push([node, [i for i in past_actions] + [stringToDirection(_[1])]])
+        curr_state = path.pop()[0]
+
+    return discovered[curr_state]
 
     # util.raiseNotDefined()
 
@@ -192,29 +188,33 @@ def aStarSearch(problem, heuristic=nullHeuristic):
     """Search the node that has the lowest combined cost and heuristic first."""
     "*** YOUR CODE HERE ***"
     # discovered nodes
-    discovered = []
-    # queue sorted by nodes with its current path cost with heuristic value
+    discovered = {}
+    # queue sorted by nodes with its current path cost and heuristic value
     path = util.PriorityQueueWithFunction(lambda state: problem.getCostOfActions(state[1]) + heuristic(state[0], problem))
-    curr_state = [problem.getStartState(), []]
-    path.push(curr_state)
+    curr_state = problem.getStartState()
+    discovered[curr_state] = []
 
     # goal check
-    while not problem.isGoalState(curr_state[0]):
-        curr_state = path.pop()
-        discovered.append(curr_state[0])
-        successors = problem.getSuccessors(curr_state[0])
+    while not problem.isGoalState(curr_state):
+        successors = problem.getSuccessors(curr_state)
         # past action history
-        past_actions = curr_state[1]
+        past_actions = discovered[curr_state]
         # Iterate through the frontier
         for _ in successors:
             node = _[0]
+            curr_action = [i for i in past_actions] + [_[1]]
             # check if the state is already expanded
             if node not in discovered:
-                if problem.isGoalState(node):
-                    return [i for i in past_actions] + [stringToDirection(_[1])]
+                path.push([node, curr_action])
+                discovered[node] = curr_action
+            # check if lower cost than current solution
+            elif problem.getCostOfActions(curr_action) < problem.getCostOfActions(discovered[node]):
+                path.push([node, curr_action])
+                discovered[node] = curr_action
 
-                path.push([node, [i for i in past_actions] + [stringToDirection(_[1])]])
+        curr_state = path.pop()[0]
 
+    return discovered[curr_state]
     # util.raiseNotDefined()
 
 
@@ -223,17 +223,3 @@ bfs = breadthFirstSearch
 dfs = depthFirstSearch
 astar = aStarSearch
 ucs = uniformCostSearch
-
-
-# Convert string direction to Direction type
-def stringToDirection(direction):
-    from game import Directions
-
-    if direction == 'North':
-        return Directions.NORTH
-    elif direction == 'South':
-        return Directions.SOUTH
-    elif direction == 'East':
-        return Directions.EAST
-    elif direction == 'West':
-        return Directions.WEST

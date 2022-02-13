@@ -386,6 +386,10 @@ def cornersHeuristic(state, problem):
     walls = problem.walls # These are the walls of the maze, as a Grid (game.py)
 
     "*** YOUR CODE HERE ***"
+    # basic attribute of the maze
+    width = walls.width
+    height = walls.height
+    # current state
     x, y, _ = state
     heu_list = []
 
@@ -625,10 +629,11 @@ def cornersHeuristic(state, problem):
         if _[index] == 1:
             heu_list.append(temp[index])
     '''
-    # attempt 5 with backward track
+    # attempt 5 with backward track (3796)
+    '''
     # run once
     if len(problem.way_points) == 0:
-        search_constraint = max((walls.height - 2) / 2, (walls.width - 2) / 2) - 1
+        search_constraint = int(max((height - 2) / 2, (width - 2) / 2)) - 1
 
         for index in range(len(corners)):
             # goal as the starting state
@@ -664,7 +669,7 @@ def cornersHeuristic(state, problem):
     if (x, y) in problem.way_points:
         cost_cache = problem.way_points[(x, y)]
         for i in range(len(_)):
-            if i == 1:
+            if _[i] == 1:
                 heu_list.append(cost_cache[i])
 
     # return minimum cached heuristic
@@ -702,8 +707,41 @@ def cornersHeuristic(state, problem):
                     # progress
                     x += 1
                 heu_list.append(net_heu)
+    '''
+    # attempt 6 L1-path-finder
+    # reduce maze complexity by waypoints
+    # calculated once
+    if 'waypoints' not in problem.way_points:
+        waypoints = [g for g in corners]
+        for x in range(1, width - 1):
+            for y in range(1, height - 1):
+                curr_pos = (x, y)
+                # get available directions
+                successors = getLocalSuccessors(curr_pos)
+                # guaranteed turning point
+                if len(successors) > 2:
+                    if curr_pos not in waypoints:
+                        waypoints.append(curr_pos)
+                # might be cornered point or straight line
+                elif len(successors) == 2:
+                    d1 = successors[0]
+                    d2 = successors[1]
+                    # check if not on a straight line
+                    if d1[0] != d2[0] and d1[1] != d2[1]:
+                        if curr_pos not in waypoints:
+                            waypoints.append(curr_pos)
 
-    return min(heu_list)
+        problem.way_points['waypoints'] = waypoints
+
+        # BFS from waypoints to all goals
+        for node in waypoints:
+            break
+
+        # BFS on all waypoints to reach the goals
+
+    # print(waypoints)
+    # return min(heu_list)
+    return 0
 
 class AStarCornersAgent(SearchAgent):
     "A SearchAgent for FoodSearchProblem using A* and your foodHeuristic"
@@ -799,34 +837,102 @@ def foodHeuristic(state, problem):
     "*** YOUR CODE HERE ***"
     # 2d list of the game grid
     food_coord = foodGrid.asList()
-    # initialization once
-    for _ in food_coord:
-        if _ not in problem.heuristicInfo:
-            problem.heuristicInfo[_] = True
-
-    # markdown eaten food
-    for _ in problem.heuristicInfo:
-        if _ not in food_coord:
-            problem.heuristicInfo[_] = False
-
+    walls = problem.walls
     x, y = position
     heu_list = []
 
+    # local function for getSuccessors
+    def getLocalSuccessors(local_state):
+        local_successors = []
+        for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
+            l_x, l_y = local_state
+            l_dx, l_dy = Actions.directionToVector(action)
+            nextx, nexty = int(l_x + l_dx), int(l_y + l_dy)
+            if not walls[nextx][nexty]:
+                nextState = (nextx, nexty)
+                local_successors.append(nextState)
 
-    '''
-    for index in problem.heuristicInfo:
-        if problem.heuristicInfo[index]:
-            pos = index
-            heu_list.append(abs(pos[0] - x) + abs(pos[1] - y))
-    '''
-    # manhattan distance to the closest food
+        return local_successors
+
+    # backward track
+    # run once when initialization
+    if len(problem.heuristicInfo) == 0:
+        problem.heuristicInfo['food_pos'] = food_coord
+        search_constraint = int(max((walls.height - 2) / 2, (walls.width - 2) / 2)) - 1
+
+        for index in range(len(food_coord)):
+            # goal as the starting state
+            g = food_coord[index]
+            path = util.Queue()
+            # only stores discovered nodes
+            discovered = []
+            curr_state = (g[0], g[1])
+            path.push(curr_state)
+            discovered.append(curr_state)
+            layer_count = 0
+
+            while layer_count < search_constraint:
+                curr_state = path.pop()
+                # frontiers
+                successors = getLocalSuccessors(curr_state)
+                # iterate through the frontiers
+                for s in successors:
+                    if s not in discovered:
+                        path.push(s)
+                        discovered.append(s)
+                        # check if s is stored
+                        if s in problem.heuristicInfo:
+                            problem.heuristicInfo[s][index] = layer_count + 1
+                        else:
+                            # undiscovered goals marked as cost 999999
+                            temp = [999999 for _ in range(len(food_coord))]
+                            temp[index] = layer_count + 1
+                            problem.heuristicInfo[s] = temp
+
+                layer_count += 1
+
+    if position in problem.heuristicInfo:
+        cost_cache = problem.heuristicInfo[position]
+        for _ in food_coord:
+            heu_list.append(cost_cache[problem.heuristicInfo['food_pos'].index(_)])
+
+        # return minimum cached heuristic
+        if len(heu_list) != 0:
+            return min(heu_list)
+
+    # default return as combined with attempt 2
+    for _ in food_coord:
+        tx, ty = _
+        dx = tx - x
+        dy = ty - y
+        # manhattan distance
+        # net_heu = abs(dx) + abs(dy)
+        # euclid distance
+        net_heu = (dx ** 2 + dy ** 2) ** 0.5
+
+        # calculated a linear algebra towards the goal
+        # same y-axis as the goal
+        if dx == 0:
+            while y <= ty:
+                if walls[x][y]:
+                    # minimal cost to get around a wall
+                    net_heu += 2
+                y += 1
+            heu_list.append(net_heu)
+        # default case
+        else:
+            m = dy / dx
+            c = ty - m * tx
+            # progress alone x-axis
+            while x <= tx:
+                if walls[int(x)][int(m * x + c)]:
+                    net_heu += 2
+                # progress
+                x += 1
+            heu_list.append(net_heu)
+
     return min(heu_list)
-    min_heu = min(heu_list)
-    min_pos = food_coord[heu_list.index(min_heu)]
-    # update heu info
-    problem.heuristicInfo[position] = (min_pos, min_heu)
-    # return heuristic
-    return min_heu
+
 
 class ClosestDotSearchAgent(SearchAgent):
     "Search for all food using a sequence of searches"
@@ -857,8 +963,6 @@ class ClosestDotSearchAgent(SearchAgent):
         problem = AnyFoodSearchProblem(gameState)
 
         "*** YOUR CODE HERE ***"
-        from search import stringToDirection
-
         food2d = food.asList()
         # simplified BFS
         path = util.Queue()
@@ -877,7 +981,7 @@ class ClosestDotSearchAgent(SearchAgent):
                 if temp not in discovered:
                     path.push(temp)
                     curr_actions = [i for i in past_actions]
-                    discovered[temp] = curr_actions + [stringToDirection(_[1])]
+                    discovered[temp] = curr_actions + [_[1]]
                     # goal check
                     if temp in food2d:
                         return discovered[temp]
