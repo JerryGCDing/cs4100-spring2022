@@ -346,11 +346,11 @@ class CornersProblem(search.SearchProblem):
                     new_state[self.corners.index(pos)] = 0
                     nextState = (nextx, nexty, tuple(new_state))
                     # update game state
-                    successors.append((nextState, action))
+                    successors.append((nextState, action, 1))
                 else:
                     # nodes need to be at same time dimension
                     nextState = (nextx, nexty, tuple([i for i in _]))
-                    successors.append((nextState, action))
+                    successors.append((nextState, action, 1))
 
         self._expanded += 1 # DO NOT CHANGE
         return successors
@@ -361,7 +361,7 @@ class CornersProblem(search.SearchProblem):
         include an illegal move, return 999999.  This is implemented for you.
         """
         if actions == None: return 999999
-        x,y= self.startingPosition
+        x, y = self.startingPosition
         for action in actions:
             dx, dy = Actions.directionToVector(action)
             x, y = int(x + dx), int(y + dy)
@@ -405,10 +405,6 @@ def cornersHeuristic(state, problem):
                 local_successors.append(nextState)
 
         return local_successors
-
-    sequence_list = []
-    for _ in range(len(corners)):
-        sequence_list.append([])
 
     # attempt 1
     '''
@@ -712,32 +708,20 @@ def cornersHeuristic(state, problem):
                     x += 1
                 heu_list.append(net_heu)
     '''
-    # attempt 6 L1-path-finder (1539)
+    # attempt 6 L1-path-finder (1512)
     # reduce maze complexity by waypoints
     # calculated once
     if 'waypoints' not in problem.way_points:
         waypoints = [g for g in corners]
-        for x in range(1, width - 1):
-            for y in range(1, height - 1):
-                curr_pos = (x, y)
+        for i in range(1, width - 1):
+            for j in range(1, height - 1):
+                curr_pos = (i, j)
                 # get available directions
                 successors = localSuccessors(curr_pos)
                 # guaranteed turning point
                 if len(successors) > 2:
-                    # test four diagonal critical wall locations
-                    wall_counts = 0
-                    if walls[x + 1][y + 1]:
-                        wall_counts += 1
-                    if walls[x + 1][y - 1]:
-                        wall_counts += 1
-                    if walls[x - 1][y + 1]:
-                        wall_counts += 1
-                    if walls[x - 1][y - 1]:
-                        wall_counts += 1
-
-                    if wall_counts >= 3:
-                        if curr_pos not in waypoints:
-                            waypoints.append(curr_pos)
+                    if curr_pos not in waypoints:
+                        waypoints.append(curr_pos)
                 # might be cornered point or straight line
                 elif len(successors) == 2:
                     d1 = successors[0]
@@ -789,31 +773,77 @@ def cornersHeuristic(state, problem):
         return min(problem.way_points[curr_state])
 
     # BFS on current position to find nearby waypoint, relative fast
+    '''
     path = util.Queue()
-    discovered = []
+    path.push((curr_state, 0))
+    discovered = [curr_state]
     # cost to nearby waypoint
     while True:
-        successors = localSuccessors(curr_state)
+        curr_state = path.pop()
+        successors = localSuccessors(curr_state[0])
         for _ in successors:
             temp = _
             if temp not in discovered:
-                path.push(temp)
+                curr_cost = curr_state[1] + 1
+                path.push((temp, curr_cost))
                 discovered.append(temp)
                 # goal check
                 if temp in problem.way_points:
-                    pre_heu = [_ for _ in problem.way_points[temp]]
+                    pre_heu = [curr_cost + _ for _ in problem.way_points[temp]]
                     # get only cost of available goals, 999999 otherwise
                     for index in range(len(_)):
                         if _[index] == 0:
                             pre_heu[index] = 999999
                     # minimum cost
                     heu_list = [_ for _ in pre_heu]
+
                     return min(heu_list)
+    '''
+    # reachable waypoints from current location and cost
+    reachable_list = []
+    # +x direction
+    for _ in range(width):
+        curr_pos = (x + _, y)
+        # if hit wall
+        if walls[x + _][y]:
+            break
+        # if reached waypoint
+        if curr_pos in problem.way_points:
+            reachable_list.append((curr_pos, _))
+            break
+    # -x direction
+    for _ in range(width):
+        curr_pos = (x - _, y)
+        # if hit wall
+        if walls[x - _][y]:
+            break
+        # if reached waypoint
+        if curr_pos in problem.way_points:
+            reachable_list.append((curr_pos, _))
+            break
+    # +y direction
+    for _ in range(height):
+        curr_pos = (x, y + _)
+        # if hit wall
+        if walls[x][y + _]:
+            break
+        # if reached waypoint
+        if curr_pos in problem.way_points:
+            reachable_list.append((curr_pos, _))
+            break
+    # -y direction
+    for _ in range(height):
+        curr_pos = (x, y - _)
+        # if hit wall
+        if walls[x][y - _]:
+            break
+        # if reached waypoint
+        if curr_pos in problem.way_points:
+            reachable_list.append((curr_pos, _))
+            break
 
-        # proceed to next layer
-        curr_state = path.pop()
-
-    # return min(heu_list)
+    heu_list = [_[1] + min(problem.way_points[_[0]]) for _ in reachable_list]
+    return min(heu_list)
     # return 0
 
 class AStarCornersAgent(SearchAgent):
@@ -929,31 +959,19 @@ def foodHeuristic(state, problem):
 
         return local_successors
 
-    # reduce maze complexity by waypoints (14788)
+    # reduce maze complexity by waypoints (14299)
     # calculated once
     if 'waypoints' not in problem.heuristicInfo:
         waypoints = [g for g in food_coord]
-        for x in range(1, width - 1):
-            for y in range(1, height - 1):
-                curr_pos = (x, y)
+        for i in range(1, width - 1):
+            for j in range(1, height - 1):
+                curr_pos = (i, j)
                 # get available directions
                 successors = localSuccessors(curr_pos)
                 # guaranteed turning point
                 if len(successors) > 2:
-                    # test four diagonal critical wall locations
-                    wall_counts = 0
-                    if walls[x + 1][y + 1]:
-                        wall_counts += 1
-                    if walls[x + 1][y - 1]:
-                        wall_counts += 1
-                    if walls[x - 1][y + 1]:
-                        wall_counts += 1
-                    if walls[x - 1][y - 1]:
-                        wall_counts += 1
-
-                    if wall_counts >= 3:
-                        if curr_pos not in waypoints:
-                            waypoints.append(curr_pos)
+                    if curr_pos not in waypoints:
+                        waypoints.append(curr_pos)
                 # might be cornered point or straight line
                 elif len(successors) == 2:
                     d1 = successors[0]
@@ -1004,29 +1022,50 @@ def foodHeuristic(state, problem):
     if curr_state in problem.heuristicInfo:
         return min(problem.heuristicInfo[curr_state])
 
-    # BFS on current position to find nearby waypoint, relative fast
-    path = util.Queue()
-    discovered = []
-    while True:
-        successors = localSuccessors(curr_state)
-        for _ in successors:
-            temp = _
-            if temp not in discovered:
-                path.push(temp)
-                discovered.append(temp)
-                # goal check
-                if temp in problem.heuristicInfo:
-                    pre_heu = [_ for _ in problem.heuristicInfo[temp]]
-                    # get only cost of available goals, 999999 otherwise
-                    for index in range(len(_)):
-                        if _[index] == 0:
-                            pre_heu[index] = 999999
-                    # minimum cost
-                    heu_list = [_ for _ in pre_heu]
-                    return min(heu_list)
+    reachable_list = []
+    # +x direction
+    for _ in range(width):
+        curr_pos = (x + _, y)
+        # if hit wall
+        if walls[x + _][y]:
+            break
+        # if reached waypoint
+        if curr_pos in problem.heuristicInfo:
+            reachable_list.append((curr_pos, _))
+            break
+    # -x direction
+    for _ in range(width):
+        curr_pos = (x - _, y)
+        # if hit wall
+        if walls[x - _][y]:
+            break
+        # if reached waypoint
+        if curr_pos in problem.heuristicInfo:
+            reachable_list.append((curr_pos, _))
+            break
+    # +y direction
+    for _ in range(height):
+        curr_pos = (x, y + _)
+        # if hit wall
+        if walls[x][y + _]:
+            break
+        # if reached waypoint
+        if curr_pos in problem.heuristicInfo:
+            reachable_list.append((curr_pos, _))
+            break
+    # -y direction
+    for _ in range(height):
+        curr_pos = (x, y - _)
+        # if hit wall
+        if walls[x][y - _]:
+            break
+        # if reached waypoint
+        if curr_pos in problem.heuristicInfo:
+            reachable_list.append((curr_pos, _))
+            break
 
-        # proceed to next layer
-        curr_state = path.pop()
+    heu_list = [_[1] + min(problem.heuristicInfo[_[0]]) for _ in reachable_list]
+    return min(heu_list)
 
 
 class ClosestDotSearchAgent(SearchAgent):
