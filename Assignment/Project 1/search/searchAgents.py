@@ -391,7 +391,7 @@ def cornersHeuristic(state, problem):
     height = walls.height
     # current state
     x, y, _ = state
-    # heu_list = []
+    heu_list = []
 
     # local function for getSuccessors
     def localSuccessors(local_state):
@@ -407,8 +407,8 @@ def cornersHeuristic(state, problem):
         return local_successors
 
     # attempt 1
-    '''
     # default start position
+    '''
     if _ == (1, 1, 1, 1):
         for i in corners:
             dx1 = x - i[0]
@@ -445,12 +445,14 @@ def cornersHeuristic(state, problem):
                 cross = abs(dx1 * dy2 - dx2 * dy1)
 
                 heu_list.append(net_heu + cross * (1 / 1000))
+    return min(heu_list)
     '''
     # attempt 2
     '''
     for index in range(len(_)):
         if _[index] == 1:
             tx, ty = corners[index]
+            l_x, l_y = x, y
             dx = tx - x
             dy = ty - y
             # manhattan distance
@@ -460,23 +462,25 @@ def cornersHeuristic(state, problem):
 
             # calculated a linear algebra towards the goal
             if dx == 0:
-                while y <= ty:
-                    if (x, y) in walls2d:
+                while l_y <= ty:
+                    if walls[l_x][l_y]:
                         # minimal cost to get around a wall
                         net_heu += 2
-                    y += 1
+                    l_y += 1
                 heu_list.append(net_heu)
             # default case
             else:
                 m = dy / dx
                 c = ty - m * tx
                 # progress alone x-axis
-                while x <= tx:
-                    if (int(x), int(m * x + c)) in walls2d:
+                while l_x <= tx:
+                    if walls[int(l_x)][int(m * l_x + c)]:
                         net_heu += 2
                     # progress
-                    x += 1
+                    l_x += 1
                 heu_list.append(net_heu)
+
+    return min(heu_list)
     '''
     # attempt 3 (exceed maximum recursion depth)
     '''
@@ -629,9 +633,9 @@ def cornersHeuristic(state, problem):
         if _[index] == 1:
             heu_list.append(temp[index])
     '''
-    # attempt 5 with backward track (3796)
-    '''
+    # attempt 5 with backward track (1966)
     # run once
+    '''
     if len(problem.way_points) == 0:
         search_constraint = int(max((height - 2) / 2, (width - 2) / 2)) - 1
 
@@ -707,6 +711,8 @@ def cornersHeuristic(state, problem):
                     # progress
                     x += 1
                 heu_list.append(net_heu)
+                
+    return min(heu_list)
     '''
     # attempt 6 L1-path-finder (1512)
     # reduce maze complexity by waypoints
@@ -959,6 +965,9 @@ def foodHeuristic(state, problem):
 
         return local_successors
 
+    # weird edge case
+    if len(food_coord) == 0:
+        return 0
     # reduce maze complexity by waypoints (14299)
     # calculated once
     if 'waypoints' not in problem.heuristicInfo:
