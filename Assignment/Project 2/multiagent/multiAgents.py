@@ -74,7 +74,33 @@ class ReflexAgent(Agent):
         newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
 
         "*** YOUR CODE HERE ***"
-        return successorGameState.getScore()
+        # wall locations to avoid trapping itself
+        foodPos = newFood.asList()
+        newWall = successorGameState.getWalls()
+        newGhostPos = successorGameState.getGhostPositions()
+
+        # helper function to evaluate the environment by given movement
+        def environmentValue(position):
+            if newFood[position[0]][position[1]]:
+                # weight by remaining food num
+                return 50 / len(foodPos) + 50
+            # wall value
+            if newWall[position[0]][position[1]]:
+                return -5
+
+            return 0
+
+        # check new pacman position for surrounding environment
+        fourDirection = [environmentValue((newPos[0] + 1, newPos[1])), environmentValue((newPos[0] - 1, newPos[1])),
+                         environmentValue((newPos[0], newPos[1] + 1)), environmentValue((newPos[0], newPos[1] - 1))]
+
+        value = sum(fourDirection)
+
+        # ghost distance
+        
+
+        return sum(fourDirection) + successorGameState.getScore() * 0.1
+        # return successorGameState.getScore() + max(fourDirection)
 
 def scoreEvaluationFunction(currentGameState):
     """
