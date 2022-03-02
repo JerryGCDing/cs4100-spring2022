@@ -222,9 +222,11 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
                 # update minimum boundary
                 if agentIndex == agentNumber - 1:
                     # pacman turn update depth after a full turn
-                    minVal = min(minVal, maximizer(gameState.generateSuccessor(agentIndex, _), depth + 1, alpha, beta))
+                    maximizer_result = maximizer(gameState.generateSuccessor(agentIndex, _), depth + 1, alpha, beta)
+                    minVal = min(minVal, maximizer_result)
                 else:
-                    minVal = min(minVal, minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1, alpha, beta))
+                    minimizer_result = minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1, alpha, beta)
+                    minVal = min(minVal, minimizer_result)
                 # prune
                 if minVal < alpha:
                     return minVal
@@ -240,7 +242,8 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
             maxVal = -999999
             for _ in gameState.getLegalActions(0):
                 # update maximum boundary
-                maxVal = max(maxVal, minimizer(gameState.generateSuccessor(0, _), depth, 1, alpha, beta))
+                minimizer_result = minimizer(gameState.generateSuccessor(0, _), depth, 1, alpha, beta)
+                maxVal = max(maxVal, minimizer_result)
 
                 # prune
                 if maxVal > beta:
@@ -253,10 +256,11 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
             return gameState.isWin() or gameState.isLose() or depth >= self.depth
 
         # root maximizer node
+        actions = gameState.getLegalActions(0)
         alpha = -999999
         beta = 999999
-        actions = gameState.getLegalActions(0)
         result = [minimizer(gameState.generateSuccessor(0, _), 0, 1, alpha, beta) for _ in actions]
+        print(alpha, beta)
 
         return actions[result.index(max(result))]
         # util.raiseNotDefined()
@@ -274,7 +278,44 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
         legal moves.
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        GhostIndex = [i for i in range(1, gameState.getNumAgents())]
+
+        def term(state, d):
+            return state.isWin() or state.isLose() or d == self.depth
+
+        def exp_value(state, d, ghost):  # minimizer
+
+            if term(state, d):
+                return self.evaluationFunction(state)
+
+            v = 0
+            prob = 1 / len(state.getLegalActions(ghost))
+
+            for action in state.getLegalActions(ghost):
+                if ghost == GhostIndex[-1]:
+                    v += prob * max_value(state.generateSuccessor(ghost, action), d + 1)
+                else:
+                    v += prob * exp_value(state.generateSuccessor(ghost, action), d, ghost + 1)
+            # print(v)
+            return v
+
+        def max_value(state, d):  # maximizer
+
+            if term(state, d):
+                return self.evaluationFunction(state)
+
+            v = -10000000000000000
+            for action in state.getLegalActions(0):
+                v = max(v, exp_value(state.generateSuccessor(0, action), d, 1))
+            # print(v)
+            return v
+
+        res = [(action, exp_value(gameState.generateSuccessor(0, action), 0, 1)) for action in
+               gameState.getLegalActions(0)]
+        res.sort(key=lambda k: k[1])
+
+        return res[-1][0]
+        # util.raiseNotDefined()
 
 def betterEvaluationFunction(currentGameState):
     """
