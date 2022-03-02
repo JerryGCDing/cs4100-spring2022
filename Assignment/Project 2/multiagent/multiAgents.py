@@ -11,7 +11,6 @@
 # Student side autograding was added by Brad Miller, Nick Hay, and
 # Pieter Abbeel (pabbeel@cs.berkeley.edu).
 
-
 from util import manhattanDistance
 from game import Directions
 import random, util
@@ -75,32 +74,36 @@ class ReflexAgent(Agent):
 
         "*** YOUR CODE HERE ***"
         # wall locations to avoid trapping itself
-        foodPos = newFood.asList()
-        newWall = successorGameState.getWalls()
-        newGhostPos = successorGameState.getGhostPositions()
+        foodPos = currentGameState.getFood().asList()
+        newGhostPos = [_.getPosition() for _ in newGhostStates]
+        value = 0
+        if newPos in foodPos:
+            # avoid being way too passive
+            value += 2
 
-        # helper function to evaluate the environment by given movement
-        def environmentValue(position):
-            if newFood[position[0]][position[1]]:
-                # weight by remaining food num
-                return 50 / len(foodPos) + 50
-            # wall value
-            if newWall[position[0]][position[1]]:
-                return -5
+        if newPos in newGhostPos and newScaredTimes[newGhostPos.index(newPos)] != 0:
+            return -100
 
-            return 0
-
-        # check new pacman position for surrounding environment
-        fourDirection = [environmentValue((newPos[0] + 1, newPos[1])), environmentValue((newPos[0] - 1, newPos[1])),
-                         environmentValue((newPos[0], newPos[1] + 1)), environmentValue((newPos[0], newPos[1] - 1))]
-
-        value = sum(fourDirection)
+        # food distance
+        foodDistance = []
+        for food in foodPos:
+            foodDistance.append(manhattanDistance(newPos, food))
 
         # ghost distance
-        
+        ghostDistance = []
+        for ghostIndex in range(len(newGhostPos)):
+            if newScaredTimes[ghostIndex] <= 1:
+                ghostDistance.append(manhattanDistance(newPos, newGhostPos[ghostIndex]))
 
-        return sum(fourDirection) + successorGameState.getScore() * 0.1
-        # return successorGameState.getScore() + max(fourDirection)
+        # avoid NaN
+        if min(newScaredTimes) <= 1:
+            # higher ghost weight as close
+            value += 2 / (min(foodDistance) + 1) - 2 / (min(ghostDistance) + 1)
+        else:
+            value += 2 / (min(foodDistance) + 1)
+
+        return value
+            # return successorGameState.getScore() + max(fourDirection)
 
 def scoreEvaluationFunction(currentGameState):
     """
@@ -161,7 +164,41 @@ class MinimaxAgent(MultiAgentSearchAgent):
         Returns whether or not the game state is a losing state
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        agentNumber = gameState.getNumAgents()
+
+        def minimizer(gameState, depth, agentIndex):
+            if end(gameState, depth):
+                return self.evaluationFunction(gameState)
+
+            minVal = 999999
+            for _ in gameState.getLegalActions(agentIndex):
+                # recursive call
+                # update minimum boundary
+                if agentIndex == agentNumber - 1:
+                    # pacman turn update depth after a full turn
+                    minVal = min(minVal, maximizer(gameState.generateSuccessor(agentIndex, _), depth + 1))
+                else:
+                    minVal = min(minVal, minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1))
+            return minVal
+
+        def maximizer(gameState, depth):
+            if end(gameState, depth):
+                return self.evaluationFunction(gameState)
+
+            maxVal = -999999
+            for _ in gameState.getLegalActions(0):
+                # update maximum boundary
+                maxVal = max(maxVal, minimizer(gameState.generateSuccessor(0, _), depth, 1))
+            return maxVal
+
+        def end(gameState, depth):
+            return gameState.isWin() or gameState.isLose() or depth >= self.depth
+
+        actions = gameState.getLegalActions(0)
+        result = [minimizer(gameState.generateSuccessor(0, _), 0, 1) for _ in actions]
+
+        return actions[result.index(max(result))]
+        # util.raiseNotDefined()
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
     """
@@ -173,7 +210,56 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         Returns the minimax action using self.depth and self.evaluationFunction
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        agentNumber = gameState.getNumAgents()
+
+        def minimizer(gameState, depth, agentIndex, alpha, beta):
+            if end(gameState, depth):
+                return self.evaluationFunction(gameState)
+
+            minVal = 999999
+            for _ in gameState.getLegalActions(agentIndex):
+                # recursive call
+                # update minimum boundary
+                if agentIndex == agentNumber - 1:
+                    # pacman turn update depth after a full turn
+                    minVal = min(minVal, maximizer(gameState.generateSuccessor(agentIndex, _), depth + 1, alpha, beta))
+                else:
+                    minVal = min(minVal, minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1, alpha, beta))
+                # prune
+                if minVal < alpha:
+                    return minVal
+                # update beta
+                beta = min(beta, minVal)
+
+            return minVal
+
+        def maximizer(gameState, depth, alpha, beta):
+            if end(gameState, depth):
+                return self.evaluationFunction(gameState)
+
+            maxVal = -999999
+            for _ in gameState.getLegalActions(0):
+                # update maximum boundary
+                maxVal = max(maxVal, minimizer(gameState.generateSuccessor(0, _), depth, 1, alpha, beta))
+
+                # prune
+                if maxVal > beta:
+                    return maxVal
+                alpha = max(alpha, maxVal)
+
+            return maxVal
+
+        def end(gameState, depth):
+            return gameState.isWin() or gameState.isLose() or depth >= self.depth
+
+        # root maximizer node
+        alpha = -999999
+        beta = 999999
+        actions = gameState.getLegalActions(0)
+        result = [minimizer(gameState.generateSuccessor(0, _), 0, 1, alpha, beta) for _ in actions]
+
+        return actions[result.index(max(result))]
+        # util.raiseNotDefined()
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
     """
