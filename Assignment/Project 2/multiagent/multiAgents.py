@@ -181,7 +181,7 @@ class MinimaxAgent(MultiAgentSearchAgent):
                 # update minimum boundary
                 if agentIndex == agentNumber - 1:
                     # pacman turn update depth after a full turn
-                    result = maximizer(gameState.generateSuccessor(agentIndex, _), depth + 1, 0)[0]
+                    result = maximizer(gameState.generateSuccessor(agentIndex, _), depth - 1, 0)[0]
                 else:
                     result = minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1)[0]
 
@@ -207,9 +207,9 @@ class MinimaxAgent(MultiAgentSearchAgent):
             return maxVal, action
 
         def end(gameState, depth):
-            return gameState.isWin() or gameState.isLose() or depth >= self.depth
+            return gameState.isWin() or gameState.isLose() or depth <= 0
 
-        return maximizer(gameState, 0, 0)[1]
+        return maximizer(gameState, self.depth, 0)[1]
         # util.raiseNotDefined()
 
 
@@ -235,7 +235,7 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
                 # update minimum boundary
                 if agentIndex == agentNumber - 1:
                     # pacman turn update depth after a full turn
-                    result = maximizer(gameState.generateSuccessor(agentIndex, _), depth + 1, 0, alpha, beta)[0]
+                    result = maximizer(gameState.generateSuccessor(agentIndex, _), depth - 1, 0, alpha, beta)[0]
                 else:
                     result = minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1, alpha, beta)
 
@@ -271,13 +271,13 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
             return maxVal, action
 
         def end(gameState, depth):
-            return gameState.isWin() or gameState.isLose() or depth >= self.depth
+            return gameState.isWin() or gameState.isLose() or depth <= 0
 
         # root maximizer node
         alpha = -999999
         beta = 999999
 
-        return maximizer(gameState, 0, 0, alpha, beta)[1]
+        return maximizer(gameState, self.depth, 0, alpha, beta)[1]
         # util.raiseNotDefined()
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
@@ -315,22 +315,22 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
                 return self.evaluationFunction(gameState)
 
             value = 0
-            weight = 1 / len(gameState.getLegalActions(agentIndex))
-            for _ in gameState.getLegalActions(agentIndex):
+            actions = gameState.getLegalActions(agentIndex)
+            for _ in actions:
                 # recursive call
                 # update minimum boundary
                 if agentIndex == agentNumber - 1:
                     # pacman turn update depth after a full turn
-                    value += weight * maximizer(gameState.generateSuccessor(agentIndex, _), depth + 1, 0)[0]
+                    value += maximizer(gameState.generateSuccessor(agentIndex, _), depth - 1, 0)[0] / len(actions)
                 else:
-                    value += weight * expectVal(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1)
+                    value += expectVal(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1) / len(actions)
 
             return value
 
         def end(gameState, depth):
-            return gameState.isWin() or gameState.isLose() or depth >= self.depth
+            return gameState.isWin() or gameState.isLose() or depth <= 0
 
-        return maximizer(gameState, 0, 0)[1]
+        return maximizer(gameState, self.depth, 0)[1]
         # util.raiseNotDefined()
 
 def betterEvaluationFunction(currentGameState):
