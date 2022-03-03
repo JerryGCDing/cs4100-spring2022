@@ -11,6 +11,7 @@
 # Student side autograding was added by Brad Miller, Nick Hay, and
 # Pieter Abbeel (pabbeel@cs.berkeley.edu).
 
+import math
 from util import manhattanDistance
 from game import Directions
 import random, util
@@ -331,6 +332,10 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
         return maximizer(gameState, self.depth, 0)[1]
         # util.raiseNotDefined()
 
+
+# currentTarget = (-1, -1)
+
+
 def betterEvaluationFunction(currentGameState):
     """
     Your extreme ghost-hunting, pellet-nabbing, food-gobbling, unstoppable
@@ -340,32 +345,51 @@ def betterEvaluationFunction(currentGameState):
     calculate the manhattan distance from current pos to food (weight 2), to ghost (weight -1) and scared ghost
     (weight 4) for score bonus. The evaluation value basis is the current score to avoid pacman playing passive also
     indicates the current position has food. And if the ghosts are scared, basically can neglect its influence on
-    current state evaluation.
+    current state evaluation. Use of natural log neglect the ghost effect when far away, but exponential when nearby.
     """
     "*** YOUR CODE HERE ***"
+    # global currentTarget
     currentPos = currentGameState.getPacmanPosition()
     currentGhostStates = currentGameState.getGhostStates()
     currentScaredTimes = [ghostState.scaredTimer for ghostState in currentGhostStates]
 
-    foodPos = currentGameState.getCapsules()
+    foodPos = currentGameState.getFood().asList()
+    capsulePos = currentGameState.getCapsules()
     newGhostPos = [_.getPosition() for _ in currentGhostStates]
     value = currentGameState.getScore()
 
     # food distance
-    foodDistance = [999999]  # fail safe
+    foodDistance = [((0, 0), 999999)]  # fail safe
+    # dotDistance = [((0, 0), 999999)]
     for food in foodPos:
-        foodDistance.append(manhattanDistance(currentPos, food))
+        foodDistance.append((food, manhattanDistance(currentPos, food)))
+        # dotDistance.append((food, manhattanDistance(currentPos, food)))
+    for capsule in capsulePos:
+        # given a bit of priority
+        foodDistance.append((capsule, manhattanDistance(currentPos, capsule) / 0.2))
 
     # ghost distance
     ghostDistance = [999999]  # fail safe
     for ghostIndex in range(len(newGhostPos)):
+        ghostPos = newGhostPos[ghostIndex]
         if currentScaredTimes[ghostIndex] <= 2:
-            ghostDistance.append(manhattanDistance(currentPos, newGhostPos[ghostIndex]))
+            ghostDistance.append(manhattanDistance(currentPos, ghostPos))
         else:
-            foodDistance.append(manhattanDistance(currentPos, newGhostPos[ghostIndex]) / 2)
+            foodDistance.append((ghostPos, manhattanDistance(currentPos, ghostPos) / 2))
 
+    foodDistance = sorted(foodDistance, key=lambda _: _[1])
+    '''
+    dotDistance = sorted(dotDistance, key=lambda _: _[1])
+    if currentTarget not in foodPos:
+        currentTarget = dotDistance[0][0]
+    '''
+
+    # targetDistance = manhattanDistance(currentPos, currentTarget)
     # avoid NaN
-    value += 2 / (min(foodDistance) + 1) - 1 / (min(ghostDistance) + 1)
+    value += 2 / (foodDistance[0][1] + 1) - 5 / (math.log(min(ghostDistance) + 0.1) + 1)  # + 1 / targetDistance
+
+    # weight by remaining food number
+    value /= (len(foodPos) + 0.1)
 
     return value
 
