@@ -73,13 +73,13 @@ class ReflexAgent(Agent):
         newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
 
         "*** YOUR CODE HERE ***"
-        # wall locations to avoid trapping itself
         foodPos = currentGameState.getFood().asList()
         newGhostPos = [_.getPosition() for _ in newGhostStates]
         value = 0
+
         if newPos in foodPos:
             # avoid being way too passive
-            value += 2
+            value += 1
 
         if newPos in newGhostPos and newScaredTimes[newGhostPos.index(newPos)] != 0:
             return -100
@@ -88,22 +88,26 @@ class ReflexAgent(Agent):
         foodDistance = []
         for food in foodPos:
             foodDistance.append(manhattanDistance(newPos, food))
+        for capsule in currentGameState.getCapsules():
+            foodDistance.append(manhattanDistance(newPos, capsule) / 1.5)
 
         # ghost distance
         ghostDistance = []
         for ghostIndex in range(len(newGhostPos)):
-            if newScaredTimes[ghostIndex] <= 1:
+            if newScaredTimes[ghostIndex] <= 2:
                 ghostDistance.append(manhattanDistance(newPos, newGhostPos[ghostIndex]))
+            else:
+                foodDistance.append(manhattanDistance(newPos, newGhostPos[ghostIndex]) / 4)
 
         # avoid NaN
         if min(newScaredTimes) <= 1:
             # higher ghost weight as close
-            value += 2 / (min(foodDistance) + 1) - 2 / (min(ghostDistance) + 1)
+            value += 2 / (min(foodDistance) + 1) - 1.5 / (min(ghostDistance) + 1)
         else:
             value += 2 / (min(foodDistance) + 1)
 
         return value
-            # return successorGameState.getScore() + max(fourDirection)
+        # return successorGameState.getScore() + max(fourDirection)
 
 def scoreEvaluationFunction(currentGameState):
     """
@@ -168,37 +172,46 @@ class MinimaxAgent(MultiAgentSearchAgent):
 
         def minimizer(gameState, depth, agentIndex):
             if end(gameState, depth):
-                return self.evaluationFunction(gameState)
+                return self.evaluationFunction(gameState), None
 
             minVal = 999999
+            action = None
             for _ in gameState.getLegalActions(agentIndex):
                 # recursive call
                 # update minimum boundary
                 if agentIndex == agentNumber - 1:
                     # pacman turn update depth after a full turn
-                    minVal = min(minVal, maximizer(gameState.generateSuccessor(agentIndex, _), depth + 1))
+                    result = maximizer(gameState.generateSuccessor(agentIndex, _), depth + 1, 0)[0]
                 else:
-                    minVal = min(minVal, minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1))
-            return minVal
+                    result = minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1)[0]
 
-        def maximizer(gameState, depth):
+                if result < minVal:
+                    minVal = result
+                    action = _
+
+            return minVal, action
+
+        def maximizer(gameState, depth, agentIndex):
             if end(gameState, depth):
-                return self.evaluationFunction(gameState)
+                return self.evaluationFunction(gameState), None
 
             maxVal = -999999
-            for _ in gameState.getLegalActions(0):
+            action = None
+            for _ in gameState.getLegalActions(agentIndex):
                 # update maximum boundary
-                maxVal = max(maxVal, minimizer(gameState.generateSuccessor(0, _), depth, 1))
-            return maxVal
+                result = minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1)[0]
+                if result > maxVal:
+                    maxVal = result
+                    action = _
+
+            return maxVal, action
 
         def end(gameState, depth):
             return gameState.isWin() or gameState.isLose() or depth >= self.depth
 
-        actions = gameState.getLegalActions(0)
-        result = [minimizer(gameState.generateSuccessor(0, _), 0, 1) for _ in actions]
-
-        return actions[result.index(max(result))]
+        return maximizer(gameState, 0, 0)[1]
         # util.raiseNotDefined()
+
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
     """
@@ -222,47 +235,49 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
                 # update minimum boundary
                 if agentIndex == agentNumber - 1:
                     # pacman turn update depth after a full turn
-                    maximizer_result = maximizer(gameState.generateSuccessor(agentIndex, _), depth + 1, alpha, beta)
-                    minVal = min(minVal, maximizer_result)
+                    result = maximizer(gameState.generateSuccessor(agentIndex, _), depth + 1, 0, alpha, beta)[0]
                 else:
-                    minimizer_result = minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1, alpha, beta)
-                    minVal = min(minVal, minimizer_result)
+                    result = minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1, alpha, beta)
+
                 # prune
-                if minVal < alpha:
-                    return minVal
+                if result < minVal:
+                    minVal = result
+                if result < alpha:
+                    return result
                 # update beta
                 beta = min(beta, minVal)
 
             return minVal
 
-        def maximizer(gameState, depth, alpha, beta):
+        def maximizer(gameState, depth, agentIndex, alpha, beta):
             if end(gameState, depth):
-                return self.evaluationFunction(gameState)
+                return self.evaluationFunction(gameState), None
 
             maxVal = -999999
-            for _ in gameState.getLegalActions(0):
+            action = None
+            for _ in gameState.getLegalActions(agentIndex):
                 # update maximum boundary
-                minimizer_result = minimizer(gameState.generateSuccessor(0, _), depth, 1, alpha, beta)
-                maxVal = max(maxVal, minimizer_result)
+                minimizer_result = minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1, alpha, beta)
+
+                if minimizer_result > maxVal:
+                    maxVal = minimizer_result
+                    action = _
 
                 # prune
-                if maxVal > beta:
-                    return maxVal
+                if minimizer_result > beta:
+                    return minimizer_result, action
                 alpha = max(alpha, maxVal)
 
-            return maxVal
+            return maxVal, action
 
         def end(gameState, depth):
             return gameState.isWin() or gameState.isLose() or depth >= self.depth
 
         # root maximizer node
-        actions = gameState.getLegalActions(0)
         alpha = -999999
         beta = 999999
-        result = [minimizer(gameState.generateSuccessor(0, _), 0, 1, alpha, beta) for _ in actions]
-        print(alpha, beta)
 
-        return actions[result.index(max(result))]
+        return maximizer(gameState, 0, 0, alpha, beta)[1]
         # util.raiseNotDefined()
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
@@ -278,43 +293,44 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
         legal moves.
         """
         "*** YOUR CODE HERE ***"
-        GhostIndex = [i for i in range(1, gameState.getNumAgents())]
+        agentNumber = gameState.getNumAgents()
 
-        def term(state, d):
-            return state.isWin() or state.isLose() or d == self.depth
+        def maximizer(gameState, depth, agentIndex):
+            if end(gameState, depth):
+                return self.evaluationFunction(gameState), None
 
-        def exp_value(state, d, ghost):  # minimizer
+            maxVal = -999999
+            action = None
+            for _ in gameState.getLegalActions(agentIndex):
+                # update maximum boundary
+                result = expectVal(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1)
+                if result > maxVal:
+                    maxVal = result
+                    action = _
 
-            if term(state, d):
-                return self.evaluationFunction(state)
+            return maxVal, action
 
-            v = 0
-            prob = 1 / len(state.getLegalActions(ghost))
+        def expectVal(gameState, depth, agentIndex):
+            if end(gameState, depth):
+                return self.evaluationFunction(gameState)
 
-            for action in state.getLegalActions(ghost):
-                if ghost == GhostIndex[-1]:
-                    v += prob * max_value(state.generateSuccessor(ghost, action), d + 1)
+            value = 0
+            weight = 1 / len(gameState.getLegalActions(agentIndex))
+            for _ in gameState.getLegalActions(agentIndex):
+                # recursive call
+                # update minimum boundary
+                if agentIndex == agentNumber - 1:
+                    # pacman turn update depth after a full turn
+                    value += weight * maximizer(gameState.generateSuccessor(agentIndex, _), depth + 1, 0)[0]
                 else:
-                    v += prob * exp_value(state.generateSuccessor(ghost, action), d, ghost + 1)
-            # print(v)
-            return v
+                    value += weight * expectVal(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1)
 
-        def max_value(state, d):  # maximizer
+            return value
 
-            if term(state, d):
-                return self.evaluationFunction(state)
+        def end(gameState, depth):
+            return gameState.isWin() or gameState.isLose() or depth >= self.depth
 
-            v = -10000000000000000
-            for action in state.getLegalActions(0):
-                v = max(v, exp_value(state.generateSuccessor(0, action), d, 1))
-            # print(v)
-            return v
-
-        res = [(action, exp_value(gameState.generateSuccessor(0, action), 0, 1)) for action in
-               gameState.getLegalActions(0)]
-        res.sort(key=lambda k: k[1])
-
-        return res[-1][0]
+        return maximizer(gameState, 0, 0)[1]
         # util.raiseNotDefined()
 
 def betterEvaluationFunction(currentGameState):
@@ -323,9 +339,37 @@ def betterEvaluationFunction(currentGameState):
     evaluation function (question 5).
 
     DESCRIPTION: <write something here so we know what you did>
+    calculate the manhattan distance from current pos to food (weight 2), to ghost (weight -1) and scared ghost
+    (weight 4) for score bonus. The evaluation value basis is the current score to avoid pacman playing passive also
+    indicates the current position has food. And if the ghosts are scared, basically can neglect its influence on
+    current state evaluation.
     """
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+    currentPos = currentGameState.getPacmanPosition()
+    currentGhostStates = currentGameState.getGhostStates()
+    currentScaredTimes = [ghostState.scaredTimer for ghostState in currentGhostStates]
+
+    foodPos = currentGameState.getCapsules()
+    newGhostPos = [_.getPosition() for _ in currentGhostStates]
+    value = currentGameState.getScore()
+
+    # food distance
+    foodDistance = [999999]  # fail safe
+    for food in foodPos:
+        foodDistance.append(manhattanDistance(currentPos, food))
+
+    # ghost distance
+    ghostDistance = [999999]  # fail safe
+    for ghostIndex in range(len(newGhostPos)):
+        if currentScaredTimes[ghostIndex] <= 2:
+            ghostDistance.append(manhattanDistance(currentPos, newGhostPos[ghostIndex]))
+        else:
+            foodDistance.append(manhattanDistance(currentPos, newGhostPos[ghostIndex]) / 2)
+
+    # avoid NaN
+    value += 2 / (min(foodDistance) + 1) - 1 / (min(ghostDistance) + 1)
+
+    return value
 
 # Abbreviation
 better = betterEvaluationFunction
