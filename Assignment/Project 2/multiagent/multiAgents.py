@@ -172,10 +172,9 @@ class MinimaxAgent(MultiAgentSearchAgent):
 
         def minimizer(gameState, depth, agentIndex):
             if end(gameState, depth):
-                return self.evaluationFunction(gameState), None
+                return self.evaluationFunction(gameState)
 
             minVal = 999999
-            action = None
             for _ in gameState.getLegalActions(agentIndex):
                 # recursive call
                 # update minimum boundary
@@ -183,13 +182,12 @@ class MinimaxAgent(MultiAgentSearchAgent):
                     # pacman turn update depth after a full turn
                     result = maximizer(gameState.generateSuccessor(agentIndex, _), depth - 1, 0)[0]
                 else:
-                    result = minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1)[0]
+                    result = minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1)
 
                 if result < minVal:
                     minVal = result
-                    action = _
 
-            return minVal, action
+            return minVal
 
         def maximizer(gameState, depth, agentIndex):
             if end(gameState, depth):
@@ -199,7 +197,7 @@ class MinimaxAgent(MultiAgentSearchAgent):
             action = None
             for _ in gameState.getLegalActions(agentIndex):
                 # update maximum boundary
-                result = minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1)[0]
+                result = minimizer(gameState.generateSuccessor(agentIndex, _), depth, agentIndex + 1)
                 if result > maxVal:
                     maxVal = result
                     action = _
